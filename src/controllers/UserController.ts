@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { UserService } from '../services/UserService';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { LoginDto } from '../dtos/user/LoginDto';
 
 export class UserController {
   private userService = new UserService();
@@ -14,13 +15,33 @@ export class UserController {
     }
   };
 
-  login = async (req: Request, res: Response) => {
+  login = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email, password } = req.body;
-      const result = await this.userService.login(email, password);
-      res.json(result);
+      const loginDto: LoginDto = req.body;
+
+      // Validation
+      if (!loginDto.email || !loginDto.password) {
+        res.status(400).json({
+          success: false,
+          message: 'Email et mot de passe requis',
+        });
+        return;
+      }
+
+      const result = await this.userService.login(loginDto);
+
+      res.status(200).json({
+        success: true,
+        message: 'Connexion réussie',
+        data: result,
+      });
     } catch (error: any) {
-      res.status(401).json({ message: error.message });
+      console.error('❌ Erreur lors de la connexion:', error);
+      
+      res.status(401).json({
+        success: false,
+        message: error.message || 'Email ou mot de passe incorrect',
+      });
     }
   };
 
@@ -48,6 +69,21 @@ export class UserController {
       res.json(user);
     } catch (error: any) {
       res.status(404).json({ message: error.message });
+    }
+  };
+
+  updateUser = async (req: Request, res: Response) => {
+    try {
+      const user = await this.userService.UpdateUser(req.params.id, req.body);
+      res.json({
+        success: true,
+        data: user,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
   };
 

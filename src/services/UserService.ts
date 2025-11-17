@@ -2,6 +2,7 @@ import { AppDataSource } from '../config/database';
 import { UserAccount } from '../entities/UserAccount';
 import { RegisterDto } from '../dtos/user/RegisterDto';
 import { LoginDto } from '../dtos/user/LoginDto';
+import { UpdateUserDto } from '../dtos/user/UpdateUserDto';
 import { hashPassword, comparePassword } from '../utils/hashPassword';
 import { generateToken } from '../utils/jwt';
 
@@ -53,6 +54,42 @@ export class UserService {
 
     return { user: userWithoutPassword, token };
   }
+
+  async UpdateUser(id: string, updateUserDto: UpdateUserDto){
+    const user = await this.userRepository.findOne({
+      where: { id_user_account: id },
+    });
+
+    if (!user) {
+      throw new Error('Utilisateur non trouvé');
+    }
+
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const existingUser = await this.userRepository.findOne({
+        where: { email: updateUserDto.email },
+      });
+
+      if (existingUser) {
+        throw new Error('Email déjà utilisé');
+      }
+  }
+  Object.assign(user, updateUserDto);
+    await this.userRepository.save(user);
+
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
+
+  async deleteUser(id: string) {
+    const result = await this.userRepository.delete(id);
+
+    if (result.affected === 0) {
+      throw new Error('Utilisateur non trouvé');
+    }
+
+    return { message: 'Utilisateur supprimé avec succès' };
+  }
+
 
   async findAll() {
     return await this.userRepository.find({
