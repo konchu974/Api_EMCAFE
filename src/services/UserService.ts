@@ -1,6 +1,7 @@
 import { AppDataSource } from '../config/database';
 import { UserAccount } from '../entities/UserAccount';
 import { RegisterDto } from '../dtos/user/RegisterDto';
+import { LoginDto } from '../dtos/user/LoginDto';
 import { hashPassword, comparePassword } from '../utils/hashPassword';
 import { generateToken } from '../utils/jwt';
 
@@ -29,14 +30,14 @@ export class UserService {
     return userWithoutPassword;
   }
 
-  async login(email: string, password: string) {
-    const user = await this.userRepository.findOne({ where: { email } });
+  async login(LoginDto: LoginDto) {
+    const user = await this.userRepository.findOne({ where: { email: LoginDto.email } });
 
     if (!user) {
       throw new Error('Email ou mot de passe incorrect');
     }
 
-    const isValidPassword = await comparePassword(password, user.password);
+    const isValidPassword = await comparePassword(LoginDto.password, user.password);
 
     if (!isValidPassword) {
       throw new Error('Email ou mot de passe incorrect');
