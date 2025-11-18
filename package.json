@@ -12,7 +12,13 @@
     "typeorm": "typeorm-ts-node-commonjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["typescript", "express", "mysql", "typeorm", "api"],
+  "keywords": [
+    "typescript",
+    "express",
+    "mysql",
+    "typeorm",
+    "api"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
