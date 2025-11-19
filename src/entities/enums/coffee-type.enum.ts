@@ -1,0 +1,7 @@
+export enum CoffeeType {
+  ARABICA = 'ARABICA',
+  ROBUSTA = 'ROBUSTA',
+  BLEND = 'BLEND',
+  DECAFFEINATED = 'DECAFFEINATED',
+  ORGANIC = 'ORGANIC'
+}
