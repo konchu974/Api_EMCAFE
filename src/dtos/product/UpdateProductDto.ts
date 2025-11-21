@@ -5,7 +5,8 @@ import {
   Min,
   Max,
   IsEnum,
-  IsBoolean
+  IsBoolean,
+  MaxLength
 } from 'class-validator';
 import { CoffeeType } from '../../entities/enums/coffee-type.enum';
 import { RoastLevel } from '../../entities/enums/roast-level.enum';
@@ -13,10 +14,12 @@ import { RoastLevel } from '../../entities/enums/roast-level.enum';
 export class UpdateProductDto {
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   name?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(300)
   description?: string;
 
   @IsOptional()
@@ -37,6 +40,7 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   format?: string;
 
   @IsOptional()
@@ -45,6 +49,7 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   origin?: string;
 
   @IsOptional()
@@ -53,13 +58,31 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   image_url?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   category?: string;
 
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+  
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  size?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  preparation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  ingredient?: string;
+
 }

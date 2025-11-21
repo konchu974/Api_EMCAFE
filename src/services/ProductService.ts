@@ -22,7 +22,7 @@ export class ProductService {
 
     const product = this.productRepository.create({
       ...createProductDto,
-      is_active: 1, // Valeur par défaut (1 = active)
+      is_active: createProductDto.is_active !== false ? 1 : 0,
       created_at: new Date(),
       updated_at: new Date()
     });
@@ -38,6 +38,7 @@ export class ProductService {
     maxIntensity?: number,
     coffeeTypes?: CoffeeType[],
     roastLevels?: RoastLevel[],
+    sizes?: string[], // 🆕 Nouveau filtre
     limit: number = 10,
     offset: number = 0
   ) {
@@ -45,21 +46,23 @@ export class ProductService {
       .where('product.is_active = :isActive', { isActive: 1 });
 
     if (search) {
-      queryBuilder.andWhere('product.name LIKE :search OR product.description LIKE :search OR product.origin LIKE :search',
-        { search: `%${search}%` });
+      queryBuilder.andWhere(
+        '(product.name LIKE :search OR product.description LIKE :search OR product.origin LIKE :search OR product.ingredient LIKE :search OR product.preparation LIKE :search)',
+        { search: `%${search}%` }
+      );
     }
 
-    if (minPrice || maxPrice) {
+    if (minPrice !== undefined || maxPrice !== undefined) {
       queryBuilder.andWhere('product.price BETWEEN :minPrice AND :maxPrice', {
-        minPrice: minPrice || 0,
-        maxPrice: maxPrice || 999999
+        minPrice: minPrice ?? 0,
+        maxPrice: maxPrice ?? 999999
       });
     }
 
-    if (minIntensity || maxIntensity) {
+    if (minIntensity !== undefined || maxIntensity !== undefined) {
       queryBuilder.andWhere('product.intensity BETWEEN :minIntensity AND :maxIntensity', {
-        minIntensity: minIntensity || 1,
-        maxIntensity: maxIntensity || 10
+        minIntensity: minIntensity ?? 1,
+        maxIntensity: maxIntensity ?? 10
       });
     }
 
@@ -71,6 +74,11 @@ export class ProductService {
       queryBuilder.andWhere('product.roast_level IN (:...roastLevels)', { roastLevels });
     }
 
+    // 🆕 Filtre par taille
+    if (sizes && sizes.length > 0) {
+      queryBuilder.andWhere('product.size IN (:...sizes)', { sizes });
+    }
+
     return await queryBuilder
       .orderBy('product.created_at', 'DESC')
       .take(limit)
@@ -78,18 +86,19 @@ export class ProductService {
       .getManyAndCount();
   }
 
-  async getProductById(id: string) {
+  async getProductById(id: string): Promise<Product> {
     const product = await this.productRepository.findOne({
       where: { id_product: id },
-      relations: ['orderItems'] // Si vous voulez charger les relations
+      relations: ['orderItems', 'orderItems.order'],
     });
-
+  
     if (!product) {
-      throw new Error('Produit non trouvé');
+      throw new Error(`Produit ${id} introuvable`);
     }
-
+  
     return product;
   }
+
 
   async updateProduct(id: string, updateProductDto: UpdateProductDto) {
     // Vérification de l'unicité du nom si celui-ci est modifié
@@ -109,7 +118,6 @@ export class ProductService {
     };
 
     if (updateProductDto.is_active !== undefined) {
-      // convert boolean (from DTO) to numeric value expected by the entity/database
       payload.is_active = updateProductDto.is_active ? 1 : 0;
     }
 
@@ -137,24 +145,24 @@ export class ProductService {
   }
 
   async updateStock(id: string, quantity: number) {
-  const product = await this.productRepository.findOne({
-    where: { id_product: id },
-  });
+    const product = await this.productRepository.findOne({
+      where: { id_product: id },
+    });
 
-  if (!product) {
-    throw new Error('Produit non trouvé');
+    if (!product) {
+      throw new Error('Produit non trouvé');
+    }
+
+    if (product.stock + quantity < 0) {
+      const error = new Error('Stock insuffisant');
+      (error as any).currentStock = product.stock; 
+      throw error;
+    }
+
+    product.stock += quantity;
+    product.updated_at = new Date();
+    return await this.productRepository.save(product);
   }
-
-  if (product.stock + quantity < 0) {
-    const error = new Error('Stock insuffisant');
-    (error as any).currentStock = product.stock; 
-    throw error;
-  }
-
-  product.stock += quantity;
-  product.updated_at = new Date();
-  return await this.productRepository.save(product);
-}
 
   async getLowStockProducts(threshold: number = 5) {
     return await this.productRepository.find({
@@ -187,6 +195,34 @@ export class ProductService {
         created_at: 'DESC'
       },
       take: limit
+    });
+  }
+
+  async getProductsBySize(size: string) {
+    return await this.productRepository.find({
+      where: {
+        size,
+        is_active: 1
+      },
+      order: {
+        name: 'ASC'
+      }
+    });
+  }
+  
+  async getProductWithVariants(productId: string): Promise<Product | null> {
+    return this.productRepository.findOne({
+      where: { id_product: productId, is_active: 1 },
+      relations: ['variants'], 
+    });
+  }
+
+
+  async getAllProductsWithVariants(): Promise<Product[]> {
+    return this.productRepository.find({
+      where: { is_active: 1 },
+      relations: ['variants'],
+      order: { created_at: 'DESC' },
     });
   }
 }

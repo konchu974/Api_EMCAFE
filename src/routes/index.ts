@@ -11,6 +11,7 @@ import { CreateOrderDto } from "../dtos/order/CreateOrderDto";
 import { OrderController } from "../controllers/OrderController";
 import { UpdateOrderStatusDto } from "../dtos/order/UpdateOrderStatusDto";
 import { UpdateStockDto } from "../dtos/product/UpdateStockDto";
+import { VariantController } from "../controllers/VariantController";
 
 const router = Router();
 
@@ -18,6 +19,7 @@ const router = Router();
 const userController = new UserController();
 const productController = new ProductController();
 const orderController = new OrderController();
+const variantController = new VariantController();
 
 // ==================== USER ROUTES ====================
 router.post(
@@ -48,9 +50,17 @@ router.delete(
 );
 
 // ==================== PRODUCT ROUTES ====================
+
+router.get('/products/full', productController.getAllProductsWithVariants); 
+
+router.get('/products/:id/full', productController.getProductWithVariants); 
+
 router.get("/products", productController.getAllProducts);
 
 router.get("/products/featured", productController.getFeaturedProducts);
+
+router.get('/size/:size', productController.getProductsBySize);
+
 
 router.get(
   "/products/low-stock",
@@ -123,5 +133,15 @@ router.delete(
   adminMiddleware,
   orderController.deleteOrder,
 );
+
+// Routes publiques
+router.get('/products/:productId/variants', variantController.getVariantsByProduct);
+router.get('/variants/:id', variantController.getVariantById);
+
+// Routes protégées (admin uniquement)
+router.post('/variants', authMiddleware, variantController.createVariant);
+router.patch('/variants/:id', authMiddleware, variantController.updateVariant);
+router.delete('/variants/:id', authMiddleware, variantController.deleteVariant);
+router.patch('/variants/:id/stock', authMiddleware, variantController.updateStock);
 
 export default router;

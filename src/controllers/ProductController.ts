@@ -3,6 +3,7 @@ import { ProductService } from '../services/ProductService';
 import { CoffeeType, RoastLevel } from '../entities/Product';
 import { validationResult } from 'express-validator';
 import { UpdateStockDto } from '../dtos/product/UpdateStockDto';
+
 export class ProductController {
   private productService = new ProductService();
 
@@ -40,6 +41,7 @@ export class ProductController {
         maxIntensity,
         coffeeTypes,
         roastLevels,
+        sizes, // 🆕 Nouveau paramètre
         limit = 10,
         offset = 0
       } = req.query;
@@ -55,6 +57,9 @@ export class ProductController {
         roastLevelsArray.filter((l): l is RoastLevel => (Object.values(RoastLevel) as string[]).includes(l)) :
         undefined;
 
+      // 🆕 Conversion des tailles
+      const sizesArray = sizes ? (Array.isArray(sizes) ? sizes : [sizes]).map(String) : undefined;
+
       const [products, total] = await this.productService.getAllProducts(
         search as string,
         minPrice ? Number(minPrice) : undefined,
@@ -63,6 +68,7 @@ export class ProductController {
         maxIntensity ? Number(maxIntensity) : undefined,
         parsedCoffeeTypes as CoffeeType[],
         parsedRoastLevels as RoastLevel[],
+        sizesArray, // 🆕 Passage du paramètre
         Number(limit),
         Number(offset)
       );
@@ -86,20 +92,37 @@ export class ProductController {
     }
   };
 
-  getProductById = async (req: Request, res: Response) => {
+  getProductById = async (req: Request, res: Response): Promise<void> => {
     try {
-      const product = await this.productService.getProductById(req.params.id);
+      const { id } = req.params;
+  
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      
+      if (!id || !uuidRegex.test(id)) {
+        res.status(400).json({
+          success: false,
+          message: 'ID produit invalide (UUID attendu)',
+        });
+        return;
+      }
+  
+      const product = await this.productService.getProductById(id);
+      
       res.json({
         success: true,
         data: product,
       });
+  
     } catch (error: any) {
-      res.status(404).json({
+      const statusCode = error.message?.includes('introuvable') ? 404 : 500;
+      
+      res.status(statusCode).json({
         success: false,
-        message: error.message || 'Produit café non trouvé',
+        message: error.message || 'Erreur lors de la récupération du produit',
       });
     }
   };
+
 
   updateProduct = async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -143,41 +166,41 @@ export class ProductController {
   };
 
   updateStock = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { quantity } = req.body;
+    try {
+      const { id } = req.params;
+      const { quantity } = req.body;
 
-    const updatedProduct = await this.productService.updateStock(id, quantity);
+      const updatedProduct = await this.productService.updateStock(id, quantity);
 
-    res.json({
-      success: true,
-      message: `Stock mis à jour avec succès. Nouveau stock: ${updatedProduct.stock}`,
-      data: {
-        productId: updatedProduct.id_product,
-        newStock: updatedProduct.stock,
-        updatedAt: updatedProduct.updated_at
-      },
-    });
-  } catch (error: any) {
-    if (error.message.includes('insuffisant')) {
-      res.status(400).json({
-        success: false,
-        message: error.message,
-        currentStock: error.currentStock 
+      res.json({
+        success: true,
+        message: `Stock mis à jour avec succès. Nouveau stock: ${updatedProduct.stock}`,
+        data: {
+          productId: updatedProduct.id_product,
+          newStock: updatedProduct.stock,
+          updatedAt: updatedProduct.updated_at
+        },
       });
-    } else if (error.message.includes('non trouvé')) {
-      res.status(404).json({
-        success: false,
-        message: error.message,
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Erreur lors de la mise à jour du stock',
-      });
+    } catch (error: any) {
+      if (error.message.includes('insuffisant')) {
+        res.status(400).json({
+          success: false,
+          message: error.message,
+          currentStock: error.currentStock 
+        });
+      } else if (error.message.includes('non trouvé')) {
+        res.status(404).json({
+          success: false,
+          message: error.message,
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Erreur lors de la mise à jour du stock',
+        });
+      }
     }
-  }
-};
+  };
 
   getLowStockProducts = async (req: Request, res: Response) => {
     try {
@@ -243,4 +266,74 @@ export class ProductController {
       });
     }
   };
+
+  getProductsBySize = async (req: Request, res: Response) => {
+    try {
+      const { size } = req.params;
+
+      if (!size) {
+        return res.status(400).json({
+          success: false,
+          message: 'Le paramètre "size" est requis'
+        });
+      }
+
+      const products = await this.productService.getProductsBySize(size);
+
+      res.json({
+        success: true,
+        message: `Produits de taille ${size}`,
+        data: products,
+        count: products.length
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: 'Erreur lors de la récupération des produits par taille',
+        error: error.message
+      });
+    }
+  };
+  
+  getProductWithVariants = async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const product = await this.productService.getProductWithVariants(id);
+  
+        if (!product) {
+          return res.status(404).json({
+            success: false,
+            message: 'Produit non trouvé',
+          });
+        }
+  
+        return res.json({
+          success: true,
+          data: product,
+        });
+      } catch (error) {
+        console.error('Error fetching product with variants:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Erreur lors de la récupération du produit',
+        });
+      }
+    };
+  
+    getAllProductsWithVariants = async (req: Request, res: Response) => {
+      try {
+        const products = await this.productService.getAllProductsWithVariants();
+  
+        return res.json({
+          success: true,
+          data: products,
+        });
+      } catch (error) {
+        console.error('Error fetching products with variants:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Erreur lors de la récupération des produits',
+        });
+      }
+    };
 }
